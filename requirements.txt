@@ -1,0 +1,11 @@
+langgraph
+langchain-core
+langchain-groq
+langchain-huggingface
+langchain-pinecone
+langchain-text-splitters
+langchain-tavily
+langchain-community
+pinecone
+beautifulsoup4
+python-dotenv
