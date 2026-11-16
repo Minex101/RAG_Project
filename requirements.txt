@@ -2,6 +2,7 @@ langgraph
 langchain-core
 langchain-groq
 langchain-huggingface
+sentence-transformers
 langchain-pinecone
 langchain-text-splitters
 langchain-tavily
