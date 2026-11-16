@@ -39,6 +39,10 @@ CHUNK_OVERLAP = 200
 # Embeddings
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"  # 384 dimensions
 
+# Pinecone
+INDEX_NAME = "industry-rag-knowledge-base"
+NAMESPACE = "langgraph-agentic-rag"
+
 # Groq LLM (check console.groq.com for current model names)
 LLM_MODEL = "llama-3.3-70b-versatile"
 LLM_TEMPERATURE = 0
