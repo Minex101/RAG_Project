@@ -44,5 +44,5 @@ INDEX_NAME = "industry-rag-knowledge-base"
 NAMESPACE = "langgraph-agentic-rag"
 
 # Groq LLM (check console.groq.com for current model names)
-LLM_MODEL = "llama-3.3-70b-versatile"
+LLM_MODEL = "openai/gpt-oss-20b"
 LLM_TEMPERATURE = 0
