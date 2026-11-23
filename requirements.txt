@@ -10,3 +10,4 @@ langchain-community
 pinecone
 beautifulsoup4
 python-dotenv
+edgartools

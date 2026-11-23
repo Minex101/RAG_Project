@@ -1,5 +1,4 @@
-from typing import List, Literal, Optional
-from typing_extensions import TypedDict
+from typing import List, Literal, TypedDict
 from pydantic import BaseModel, Field
 from langchain_core.documents import Document 
 from langchain_core.messages import HumanMessage
@@ -375,10 +374,10 @@ def ask_agent(question: str):
         "web_grade": "",
         "answer": "",
         "source_used": "",
-        "retry_count": 0,          # needed, or the retry path crashes
+        "retry_count": 0,
     }
 
-    result = app.invoke(initial_state)     # ← this runs the whole graph
+    result = app.invoke(initial_state)
 
     print("\nSOURCE USED:", result["source_used"])
     print("\nANSWER:\n", result["answer"])

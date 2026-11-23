@@ -29,9 +29,6 @@ print("TAVILY_API_KEY configured:", bool(os.getenv("TAVILY_API_KEY")))
 
 # ---------------- Settings ----------------
 
-# Knowledge base source
-SOURCE_URL = "https://docs.langchain.com/oss/python/langgraph/agentic-rag"
-
 # Chunking
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
@@ -41,8 +38,11 @@ EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"  # 384 dimensions
 
 # Pinecone
 INDEX_NAME = "industry-rag-knowledge-base"
-NAMESPACE = "langgraph-agentic-rag"
+NAMESPACE = "sec-filings"
 
-# Groq LLM (check console.groq.com for current model names)
+# Groq LLM 
 LLM_MODEL = "openai/gpt-oss-20b"
 LLM_TEMPERATURE = 0
+
+# Finance
+TICKER = "AAPL"
