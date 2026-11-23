@@ -34,21 +34,19 @@ router_llm = llm.with_structured_output(RouteDecision, method="json_mode")
 def route_question(state: AgentState):
     question = state["question"]
     decision = router_llm.invoke(f'''
-                        You are a routing LLM. 
-                        Route to "kb" if the question requires information from:
-                         - the knowledge base documents (Agentic RAG docs) that were ingested from the web.
-                         - LanGraph Agentic RAG workflow.
-                         - query rewriting, retrieval, and reasoning over the knowledge base documents.
-                        Route to "direct" only for greeting or simple chat questions.
+        You are a routing LLM. 
+        Route to "kb" if the question is about a company's business, products, segments,
+        risk factors, competition, results, revenue, margins, outlook or anything in its SEC 10-K filing.
+        Route to "direct" only for greetings or simple chat.
 
-                        Question: {question}
+        Question: {question}
 
-                        Return your response as valid JSON.
-                        Example:
-                        {{
-                            "route": "kb"
-                        }}
-                    ''')
+        Return your response as valid JSON.
+        Example:
+        {{
+            "route": "kb"
+        }}
+    ''')
     
     print("[ROUTER]", decision.route)
     
@@ -81,26 +79,30 @@ def grade_kb_evidence(state: AgentState):
     question = state["question"]
 
     context = "\n\n".join(
-        f"Source:{doc.metadata.get('source')} \n {doc.page_content}" for doc in state["kb_docs"]
+        f"[{doc.metadata.get('ticker')} {doc.metadata.get('form')} | "
+        f"{doc.metadata.get('section')} {doc.metadata.get('section_name')} | "
+        f"filed {doc.metadata.get('filing_date')}]\n{doc.page_content}"
+        for doc in state["kb_docs"]
     )
 
     grade = kb_grade_llm.invoke(f'''
-                        You are an evidence grading LLM.
-                        Grade the evidence retrieved from the knowledge base documents for the question below.
-                        
-                        Question: 
-                        {question}
+        You are an evidence grading LLM.
+        Grade "good" only if the filing excerpts directly answer the question.
+        If the question asks for a number that is not in the excerpts, grade "weak".
+        
+        Question: 
+        {question}
 
-                        Private KB Evidence:
-                        {context}
+        Private KB Evidence:
+        {context}
 
-                        Can the evidence answer the question? Grade as "good" if it can answer.
-                        return "weak" if it cannot answer or is incomplete.
+        Can the evidence answer the question? Grade as "good" if it can answer.
+        return "weak" if it cannot answer or is incomplete.
 
-                        return your response as valid JSON.
-                        Example:
-                        {{"grade": "good"}}
-                    ''')
+        return your response as valid JSON.
+        Example:
+        {{"grade": "good"}}
+    ''')
 
     print("[KB Grader] Grade:", grade.grade)
 
@@ -217,19 +219,21 @@ def generate_from_kb(state: AgentState):
     question = state["question"]
 
     context = "\n\n".join(
-        f"[KB Source: {doc.metadata.get('source')}]\n{doc.page_content}"
+        f"[{doc.metadata.get('ticker')} {doc.metadata.get('form')} | "
+        f"{doc.metadata.get('section')} {doc.metadata.get('section_name')} | "
+        f"filed {doc.metadata.get('filing_date')}]\n{doc.page_content}"
         for doc in state["kb_docs"]
     )
 
     answer = llm.invoke(f'''
-    You are a technical instructor
-    Answer using ONLY the private KB context.
+    You are an equity research assistant.
+    Answer using ONLY the SEC filing excerpts below.
 
     Rules:
-    - Beginner-friendly explanation.
-    - Do not invent unsupported details.
-    - Mention that the answer is based on ther private KB.
-    - Include source type: Private KB.
+    - Do not invent facts or numbers. Only quote numbers that appear in the excerpts.
+    - Cite each claim with its section, e.g. (AAPL 10-K, Item 1A).
+    - If the excerpts only partly answer, say what is missing.
+    - Do not give buy/sell/hold advice.
 
     Question:
     {question}
