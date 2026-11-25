@@ -10,6 +10,8 @@ class RouteDecision(BaseModel):
     route: Literal["kb", "direct"] = Field(
         description="Use kb for question needing Agentic RAG docs; direct for greeting/simple chat."
         )
+    section: Literal["Item 1", "Item 1A", "Item 1C", "Item 2", "Item 3",
+                     "Item 5", "Item 7", "Item 7A", "any"] = "any"
 
 class EvidenceGrade(BaseModel):
     grade: Literal["good", "weak"] = Field(
@@ -26,6 +28,7 @@ class AgentState(TypedDict):
     answer: str
     source_used: str
     retry_count: int
+    section: str
 
 # -- Nodes --
 # -- NODE 1: Route Question --
@@ -39,12 +42,24 @@ def route_question(state: AgentState):
         risk factors, competition, results, revenue, margins, outlook or anything in its SEC 10-K filing.
         Route to "direct" only for greetings or simple chat.
 
+        Also choose the section to search:
+        - "Item 1": business, products, services, competition
+        - "Item 1A": risk factors
+        - "Item 1C": cybersecurity
+        - "Item 2": properties
+        - "Item 3": lawsuits and legal proceedings
+        - "Item 5": dividends, buybacks, stock
+        - "Item 7": sales, margins, expenses, results
+        - "Item 7A": interest rate and currency risk
+        - "any": unclear, or covers several sections
+
         Question: {question}
 
         Return your response as valid JSON.
         Example:
         {{
-            "route": "kb"
+            "route": "kb",
+            "section": "Item 3"
         }}
     ''')
     
@@ -52,7 +67,8 @@ def route_question(state: AgentState):
     
     return {
         "current_query": question,
-        "source_used": decision.route
+        "source_used": decision.route,
+        "section": decision.section,
     }
 
 def route_after_router(state: AgentState) -> Literal["retrieve_kb", "direct_answer"]:
@@ -64,7 +80,10 @@ def route_after_router(state: AgentState) -> Literal["retrieve_kb", "direct_answ
 
 def retrieve_kb(state: AgentState):
     query = state["current_query"]
-    docs = get_retriever().invoke(query)
+    section = state["section"] if state["retry_count"] == 0 else "any"
+    docs = get_retriever(section=section).invoke(query)
+
+    print("[KB Retriever] Section:", section)
 
     print("[KB Retriever] Query:", query)
     print(f"[KB Retriever] Retrieved: {len(docs)} chunks")
@@ -379,6 +398,7 @@ def ask_agent(question: str):
         "answer": "",
         "source_used": "",
         "retry_count": 0,
+        "section": "any",
     }
 
     result = app.invoke(initial_state)

@@ -1,0 +1,12 @@
+[
+  {"question": "What products does Apple sell?", "route": "kb", "section": "Item 1", "keywords": ["iPhone", "Mac", "iPad"]},
+  {"question": "What services does Apple offer?", "route": "kb", "section": "Item 1", "keywords": ["App Store", "iCloud"]},
+  {"question": "What are Apple's main supply chain risks?", "route": "kb", "section": "Item 1A", "keywords": ["supply"]},
+  {"question": "How does competition affect Apple?", "route": "kb", "section": "Item 1A", "keywords": ["competit"]},
+  {"question": "What risks does Apple face from international operations?", "route": "kb", "section": "Item 1A", "keywords": ["international"]},
+  {"question": "How did Apple's total net sales change this year?", "route": "kb", "section": "Item 7", "keywords": ["net sales"]},
+  {"question": "How did iPhone net sales perform?", "route": "kb", "section": "Item 7", "keywords": ["iPhone"]},
+  {"question": "What happened to Apple's gross margin?", "route": "kb", "section": "Item 7", "keywords": ["gross margin"]},
+  {"question": "hi", "route": "direct", "section": null, "keywords": []},
+  {"question": "thanks, that's helpful", "route": "direct", "section": null, "keywords": []}
+]

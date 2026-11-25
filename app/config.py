@@ -34,11 +34,11 @@ CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 
 # Embeddings
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"  # 384 dimensions
+EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"  # 768 dimensions
 
 # Pinecone
 INDEX_NAME = "industry-rag-knowledge-base"
-NAMESPACE = "sec-filings"
+NAMESPACE = "sec-filings-768"
 
 # Groq LLM 
 LLM_MODEL = "openai/gpt-oss-20b"

@@ -25,7 +25,12 @@ print(filing)
 sections = [
     ("Item 1", "Business", tenk.business),
     ("Item 1A", "Risk Factors", tenk.risk_factors),
+    ("Item 1C", "Cybersecurity", tenk["Item 1C"]),
+    ("Item 2", "Properties", tenk["Item 2"]),
+    ("Item 3", "Legal Proceedings", tenk["Item 3"]),
+    ("Item 5", "Market for Stock, Dividends and Buybacks", tenk["Item 5"]),
     ("Item 7", "MD&A", tenk.management_discussion),
+    ("Item 7A", "Market Risk", tenk["Item 7A"]),
 ]
 
 # One Document per section, with metadata for filtering and citations
@@ -84,7 +89,7 @@ existing_indexes = [index_info["name"] for index_info in pc.list_indexes()]
 if INDEX_NAME not in existing_indexes:
     pc.create_index(
         name=INDEX_NAME,
-        dimension=384,
+        dimension=768,
         metric="cosine",
         spec=ServerlessSpec(
             cloud="aws",

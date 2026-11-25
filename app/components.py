@@ -27,7 +27,7 @@ llm = ChatGroq(
 # ---
 
 # PineCone Retriever
-def get_retriever(k: int = 3):
+def get_retriever(k: int = 8, section: str = "any"):
     embedding_model = HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL,
         encode_kwargs={"normalize_embeddings": True},
@@ -41,7 +41,11 @@ def get_retriever(k: int = 3):
         namespace=NAMESPACE,
     )
 
-    return vector_store.as_retriever(search_kwargs={"k": k})
+    search_kwargs = {"k": k}
+    if section != "any":
+        search_kwargs["filter"] = {"section": section}
+
+    return vector_store.as_retriever(search_kwargs=search_kwargs)
 
 
 # ---
