@@ -21,13 +21,16 @@ from app.config import (
 llm = ChatGroq(
     model_name=LLM_MODEL,
     temperature=LLM_TEMPERATURE,
+    reasoning_effort="low",   # think less, so there is room to answer
+    max_tokens=3000,          # limit for thinking + answer
+    max_retries=5,            # retry on 429 errors
 )
 
 
 # ---
 
 # PineCone Retriever
-def get_retriever(k: int = 3):
+def get_retriever(k: int = 8, section: str = "any"):
     embedding_model = HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL,
         encode_kwargs={"normalize_embeddings": True},
@@ -41,7 +44,11 @@ def get_retriever(k: int = 3):
         namespace=NAMESPACE,
     )
 
-    return vector_store.as_retriever(search_kwargs={"k": k})
+    search_kwargs = {"k": k}
+    if section != "any":
+        search_kwargs["filter"] = {"section": section}
+
+    return vector_store.as_retriever(search_kwargs=search_kwargs)
 
 
 # ---

@@ -1,5 +1,4 @@
-from typing import List, Literal, Optional
-from typing_extensions import TypedDict
+from typing import List, Literal, TypedDict
 from pydantic import BaseModel, Field
 from langchain_core.documents import Document 
 from langchain_core.messages import HumanMessage
@@ -9,8 +8,10 @@ from app.components import llm, get_retriever, web_search
 
 class RouteDecision(BaseModel):
     route: Literal["kb", "direct"] = Field(
-        description="Use kb for question needing Agentic RAG docs; direct for greeting/simple chat."
+        description="Use kb for company or SEC filing questions; direct for greeting/simple chat."
         )
+    section: Literal["Item 1", "Item 1A", "Item 1C", "Item 2", "Item 3",
+                     "Item 5", "Item 7", "Item 7A", "Item 8", "any"] = "any"
 
 class EvidenceGrade(BaseModel):
     grade: Literal["good", "weak"] = Field(
@@ -27,6 +28,7 @@ class AgentState(TypedDict):
     answer: str
     source_used: str
     retry_count: int
+    section: str
 
 # -- Nodes --
 # -- NODE 1: Route Question --
@@ -35,27 +37,39 @@ router_llm = llm.with_structured_output(RouteDecision, method="json_mode")
 def route_question(state: AgentState):
     question = state["question"]
     decision = router_llm.invoke(f'''
-                        You are a routing LLM. 
-                        Route to "kb" if the question requires information from:
-                         - the knowledge base documents (Agentic RAG docs) that were ingested from the web.
-                         - LanGraph Agentic RAG workflow.
-                         - query rewriting, retrieval, and reasoning over the knowledge base documents.
-                        Route to "direct" only for greeting or simple chat questions.
+        You are a routing LLM. 
+        Route to "kb" if the question is about a company's business, products, segments,
+        risk factors, competition, results, revenue, margins, outlook or anything in its SEC 10-K filing.
+        Route to "direct" only for greetings or simple chat.
 
-                        Question: {question}
+        Also choose the section to search:
+        - "Item 1": business, products, services, competitors
+        - "Item 1A": risk factors, including any question about risks, threats or how something could hurt the company
+        - "Item 1C": cybersecurity
+        - "Item 2": properties
+        - "Item 3": lawsuits and legal proceedings
+        - "Item 5": dividends, buybacks, stock
+        - "Item 7": why results changed, segment and product sales, outlook
+        - "Item 8": exact figures such as total revenue, net income, EPS, cash, debt, assets, cash flow
+        - "Item 7A": interest rate and currency risk
+        - "any": unclear, or covers several sections
 
-                        Return your response as valid JSON.
-                        Example:
-                        {{
-                            "route": "kb"
-                        }}
-                    ''')
+        Question: {question}
+
+        Return your response as valid JSON.
+        Example:
+        {{
+            "route": "kb",
+            "section": "Item 3"
+        }}
+    ''')
     
     print("[ROUTER]", decision.route)
     
     return {
         "current_query": question,
-        "source_used": decision.route
+        "source_used": decision.route,
+        "section": decision.section,
     }
 
 def route_after_router(state: AgentState) -> Literal["retrieve_kb", "direct_answer"]:
@@ -67,7 +81,10 @@ def route_after_router(state: AgentState) -> Literal["retrieve_kb", "direct_answ
 
 def retrieve_kb(state: AgentState):
     query = state["current_query"]
-    docs = get_retriever().invoke(query)
+    section = state["section"] if state["retry_count"] == 0 else "any"
+    docs = get_retriever(section=section).invoke(query)
+
+    print("[KB Retriever] Section:", section)
 
     print("[KB Retriever] Query:", query)
     print(f"[KB Retriever] Retrieved: {len(docs)} chunks")
@@ -82,26 +99,30 @@ def grade_kb_evidence(state: AgentState):
     question = state["question"]
 
     context = "\n\n".join(
-        f"Source:{doc.metadata.get('source')} \n {doc.page_content}" for doc in state["kb_docs"]
+        f"[{doc.metadata.get('ticker')} {doc.metadata.get('form')} | "
+        f"{doc.metadata.get('section')} {doc.metadata.get('section_name')} | "
+        f"filed {doc.metadata.get('filing_date')}]\n{doc.page_content}"
+        for doc in state["kb_docs"]
     )
 
     grade = kb_grade_llm.invoke(f'''
-                        You are an evidence grading LLM.
-                        Grade the evidence retrieved from the knowledge base documents for the question below.
-                        
-                        Question: 
-                        {question}
+        You are an evidence grading LLM.
+        Grade "good" only if the filing excerpts directly answer the question.
+        If the question asks for a number that is not in the excerpts, grade "weak".
+        
+        Question: 
+        {question}
 
-                        Private KB Evidence:
-                        {context}
+        Private KB Evidence:
+        {context}
 
-                        Can the evidence answer the question? Grade as "good" if it can answer.
-                        return "weak" if it cannot answer or is incomplete.
+        Can the evidence answer the question? Grade as "good" if it can answer.
+        return "weak" if it cannot answer or is incomplete.
 
-                        return your response as valid JSON.
-                        Example:
-                        {{"grade": "good"}}
-                    ''')
+        return your response as valid JSON.
+        Example:
+        {{"grade": "good"}}
+    ''')
 
     print("[KB Grader] Grade:", grade.grade)
 
@@ -218,19 +239,23 @@ def generate_from_kb(state: AgentState):
     question = state["question"]
 
     context = "\n\n".join(
-        f"[KB Source: {doc.metadata.get('source')}]\n{doc.page_content}"
+        f"[{doc.metadata.get('ticker')} {doc.metadata.get('form')} | "
+        f"{doc.metadata.get('section')} {doc.metadata.get('section_name')} | "
+        f"filed {doc.metadata.get('filing_date')}]\n{doc.page_content}"
         for doc in state["kb_docs"]
     )
 
     answer = llm.invoke(f'''
-    You are a technical instructor
-    Answer using ONLY the private KB context.
+    You are an equity research assistant.
+    Answer using ONLY the SEC filing excerpts below.
 
     Rules:
-    - Beginner-friendly explanation.
-    - Do not invent unsupported details.
-    - Mention that the answer is based on ther private KB.
-    - Include source type: Private KB.
+    - Do not invent facts or numbers. Only quote numbers that appear in the excerpts.
+    - Cite each claim using the ticker and section in the excerpt header, e.g. (TICKER 10-K, Item 1A).
+    - If the excerpts only partly answer, say what is missing.
+    - Do not give buy/sell/hold advice.
+    - Write numbers exactly as shown in the excerpts, with their units (e.g. in millions).
+    - Check the year heading before using a number from a table.
 
     Question:
     {question}
@@ -251,15 +276,14 @@ def generate_from_web(state: AgentState):
     web_context = state["web_results"]
 
     answer = llm.invoke(f'''
-    You are a technical instructor
-        The private KB was insufficient, so web search was used.
-    
+        You are an equity research assistant.
+        The SEC filing excerpts were insufficient, so web search was used.
+
         Rules:
-        - Beginner-friendly explanation.
-        - Do not invent unsupported details.
-        - Mention that the answer is based on Tavily web search.
-        - Include source type: Web Search.
-        - If URLs are present in context, include the most useful URLs.
+        - Start by saying this answer comes from web search, not the SEC filing.
+        - Use ONLY the context below. Do not invent facts or numbers.
+        - Include the URL for each claim.
+        - Do not give buy/sell/hold advice.
 
         Question:
         {question}
@@ -280,6 +304,7 @@ def direct_answer(state: AgentState):
 
     answer = llm.invoke(f'''
     Respond briefly and naturally
+    Do not give buy/sell/hold advice or state company facts or numbers.
 
     Message:
     {question}
@@ -375,10 +400,11 @@ def ask_agent(question: str):
         "web_grade": "",
         "answer": "",
         "source_used": "",
-        "retry_count": 0,          # needed, or the retry path crashes
+        "retry_count": 0,
+        "section": "any",
     }
 
-    result = app.invoke(initial_state)     # ← this runs the whole graph
+    result = app.invoke(initial_state)
 
     print("\nSOURCE USED:", result["source_used"])
     print("\nANSWER:\n", result["answer"])
