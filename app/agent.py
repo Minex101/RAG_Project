@@ -11,7 +11,7 @@ class RouteDecision(BaseModel):
         description="Use kb for company or SEC filing questions; direct for greeting/simple chat."
         )
     section: Literal["Item 1", "Item 1A", "Item 1C", "Item 2", "Item 3",
-                     "Item 5", "Item 7", "Item 7A", "any"] = "any"
+                     "Item 5", "Item 7", "Item 7A", "Item 8", "any"] = "any"
 
 class EvidenceGrade(BaseModel):
     grade: Literal["good", "weak"] = Field(
@@ -49,7 +49,8 @@ def route_question(state: AgentState):
         - "Item 2": properties
         - "Item 3": lawsuits and legal proceedings
         - "Item 5": dividends, buybacks, stock
-        - "Item 7": sales, margins, expenses, results
+        - "Item 7": why results changed, segment and product sales, outlook
+        - "Item 8": exact figures such as total revenue, net income, EPS, cash, debt, assets, cash flow
         - "Item 7A": interest rate and currency risk
         - "any": unclear, or covers several sections
 
@@ -253,6 +254,8 @@ def generate_from_kb(state: AgentState):
     - Cite each claim using the ticker and section in the excerpt header, e.g. (TICKER 10-K, Item 1A).
     - If the excerpts only partly answer, say what is missing.
     - Do not give buy/sell/hold advice.
+    - Write numbers exactly as shown in the excerpts, with their units (e.g. in millions).
+    - Check the year heading before using a number from a table.
 
     Question:
     {question}

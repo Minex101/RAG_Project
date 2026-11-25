@@ -8,6 +8,8 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from pinecone import Pinecone, ServerlessSpec
 from langchain_pinecone import PineconeVectorStore
 
+
+from app.components import llm
 from app.config import CHUNK_SIZE, CHUNK_OVERLAP, EMBEDDING_MODEL, INDEX_NAME, TICKER, NAMESPACE
 
 # ---
@@ -69,6 +71,49 @@ splitter = RecursiveCharacterTextSplitter(
 )
 
 chunks = splitter.split_documents(raw_documents)
+
+financials = tenk.financials
+
+statements = [
+    ("Income Statement", financials.income_statement()),
+    ("Balance Sheet", financials.balance_sheet()),
+    ("Cash Flow Statement", financials.cash_flow_statement()),
+]
+
+print("\n-- ITEM 8 TABLES --\n")
+for i, (name, statement) in enumerate(statements):
+    if statement is None:
+        print(f"Skipped {name}: not found")
+        continue
+
+    table = statement.to_markdown()
+
+    description = llm.invoke(f'''
+    Describe this {TICKER} {name} in 3-4 sentences so it can be found by search.
+    Say what it shows, which years, the units, and the main line items.
+    Do not include any numbers except the years. Do not add outside facts.
+
+    {table}
+    ''').content
+
+    print(f"{name}: {description}\n")
+
+    chunks.append(
+        Document(
+            page_content=f"{description}\n\n{table}",
+            metadata={
+                "ticker": TICKER,
+                "form": "10-K",
+                "section": "Item 8",
+                "section_name": name,
+                "filing_date": str(filing.filing_date),
+                "period": str(filing.period_of_report),
+                "accession_no": filing.accession_no,
+                "url": filing.homepage_url,
+                "start_index": i,   # keeps the ids different
+            },
+        )
+    )
 
 print("\n-- CHUNKS SPLITTER --\n")
 print("Number of chunks created:", len(chunks))
