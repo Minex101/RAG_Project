@@ -8,7 +8,7 @@ from app.components import llm, get_retriever, web_search
 
 class RouteDecision(BaseModel):
     route: Literal["kb", "direct"] = Field(
-        description="Use kb for question needing Agentic RAG docs; direct for greeting/simple chat."
+        description="Use kb for company or SEC filing questions; direct for greeting/simple chat."
         )
     section: Literal["Item 1", "Item 1A", "Item 1C", "Item 2", "Item 3",
                      "Item 5", "Item 7", "Item 7A", "any"] = "any"
@@ -43,8 +43,8 @@ def route_question(state: AgentState):
         Route to "direct" only for greetings or simple chat.
 
         Also choose the section to search:
-        - "Item 1": business, products, services, competition
-        - "Item 1A": risk factors
+        - "Item 1": business, products, services, competitors
+        - "Item 1A": risk factors, including any question about risks, threats or how something could hurt the company
         - "Item 1C": cybersecurity
         - "Item 2": properties
         - "Item 3": lawsuits and legal proceedings
@@ -250,7 +250,7 @@ def generate_from_kb(state: AgentState):
 
     Rules:
     - Do not invent facts or numbers. Only quote numbers that appear in the excerpts.
-    - Cite each claim with its section, e.g. (AAPL 10-K, Item 1A).
+    - Cite each claim using the ticker and section in the excerpt header, e.g. (TICKER 10-K, Item 1A).
     - If the excerpts only partly answer, say what is missing.
     - Do not give buy/sell/hold advice.
 
@@ -273,15 +273,14 @@ def generate_from_web(state: AgentState):
     web_context = state["web_results"]
 
     answer = llm.invoke(f'''
-    You are a technical instructor
-        The private KB was insufficient, so web search was used.
-    
+        You are an equity research assistant.
+        The SEC filing excerpts were insufficient, so web search was used.
+
         Rules:
-        - Beginner-friendly explanation.
-        - Do not invent unsupported details.
-        - Mention that the answer is based on Tavily web search.
-        - Include source type: Web Search.
-        - If URLs are present in context, include the most useful URLs.
+        - Start by saying this answer comes from web search, not the SEC filing.
+        - Use ONLY the context below. Do not invent facts or numbers.
+        - Include the URL for each claim.
+        - Do not give buy/sell/hold advice.
 
         Question:
         {question}
@@ -302,6 +301,7 @@ def direct_answer(state: AgentState):
 
     answer = llm.invoke(f'''
     Respond briefly and naturally
+    Do not give buy/sell/hold advice or state company facts or numbers.
 
     Message:
     {question}

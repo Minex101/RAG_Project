@@ -21,6 +21,9 @@ from app.config import (
 llm = ChatGroq(
     model_name=LLM_MODEL,
     temperature=LLM_TEMPERATURE,
+    reasoning_effort="low",   # think less, so there is room to answer
+    max_tokens=3000,          # limit for thinking + answer
+    max_retries=5,            # retry on 429 errors
 )
 
 

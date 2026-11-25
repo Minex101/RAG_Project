@@ -1,71 +1,45 @@
 import json
 import time
 
-from app.agent import app, route_question
-from app.components import get_retriever
-
-K = 3
+from app.agent import ask_agent
 
 with open("evals/eval_set.json") as f:
     eval_set = json.load(f)
 
-retriever = get_retriever(k=K)   # build once, not every question
-
-route_correct = 0
-retrieval_hits, retrieval_total = 0, 0
-keyword_hits, keyword_total = 0, 0
-rows = []
+route_score = 0
+section_score = 0
+keyword_score = 0
+kb_total = 0   # questions that need the filing
 
 for case in eval_set:
-    q = case["question"]
-    print(f"\n=== {q} ===")
+    print("\n=== ", case["question"], " ===")
 
-    # 1) Routing
-    route = route_question({"question": q})["source_used"]
+    result = ask_agent(case["question"])
+
+    # 1) Routing: did it go to kb or direct correctly?
+    route = "direct" if result["source_used"] == "direct" else "kb"
     route_ok = route == case["route"]
-    route_correct += route_ok
+    route_score += route_ok
+    print("Route correct:", route_ok)
 
-    # 2) Retrieval hit@k (only for kb questions)
-    hit = None
-    if case["section"]:
-        docs = retriever.invoke(q)
-        sections = [d.metadata.get("section") for d in docs]
-        hit = case["section"] in sections
-        retrieval_hits += hit
-        retrieval_total += 1
-        print("Retrieved sections:", sections)
+    if case["route"] == "kb":
+        kb_total += 1
 
-    # 3) Full agent run + keyword check
-    result = app.invoke({
-        "question": q, "current_query": q, "kb_docs": [], "web_results": "",
-        "kb_grade": "", "web_grade": "", "answer": "", "source_used": "", "retry_count": 0,
-    })
-    answer = result["answer"].lower()
+        # 2) Retrieval: did we get chunks from the right section?
+        sections = [doc.metadata["section"] for doc in result["kb_docs"]]
+        section_ok = case["section"] in sections
+        section_score += section_ok
+        print("Section correct:", section_ok)
 
-    kw_ok = None
-    if case["keywords"]:
-        kw_ok = all(k.lower() in answer for k in case["keywords"])
-        keyword_hits += kw_ok
-        keyword_total += 1
+        # 3) Answer: does it contain the keywords?
+        answer = result["answer"].lower()
+        keywords_ok = all(word.lower() in answer for word in case["keywords"])
+        keyword_score += keywords_ok
+        print("Keywords correct:", keywords_ok)
 
-    rows.append({
-        "question": q,
-        "route_ok": route_ok,
-        "retrieval_hit": hit,
-        "keywords_ok": kw_ok,
-        "source_used": result["source_used"],
-    })
+    time.sleep(15)   # groq rate limits
 
-    time.sleep(1)   # groq rate limits
-
-# ---- Report ----
-print("\n\n===== RESULTS =====")
-for r in rows:
-    print(r)
-
-print(f"\nRouting accuracy: {route_correct}/{len(eval_set)}")
-print(f"Retrieval hit@{K}: {retrieval_hits}/{retrieval_total}")
-print(f"Answer keyword match: {keyword_hits}/{keyword_total}")
-
-with open("evals/results.json", "w") as f:
-    json.dump(rows, f, indent=2)
+print("\n===== RESULTS =====")
+print(f"Routing:  {route_score}/{len(eval_set)}")
+print(f"Section:  {section_score}/{kb_total}")
+print(f"Keywords: {keyword_score}/{kb_total}")

@@ -15,7 +15,7 @@ from app.config import CHUNK_SIZE, CHUNK_OVERLAP, EMBEDDING_MODEL, INDEX_NAME, T
 
 # Load the latest 10-K from SEC EDGAR
 company = Company(TICKER)
-filing = company.get_filings(form="10-K").latest()
+filing = company.get_filings(form="10-K", amendments=False).latest()
 tenk = filing.obj()
 
 print("\n-- SEC FILING --\n")
